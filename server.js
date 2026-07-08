@@ -2,6 +2,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./src/config/db");
+const authRoutes = require('./src/routes/authRoutes');
 
 dotenv.config();
 
@@ -11,6 +12,9 @@ const app = express();
 
 app.use(express.json());
 app.use(cors());
+
+// Mount auth routes
+app.use('/api/auth', authRoutes);
 
 app.get("/", (req, res) => {
   res.send("HR Management System API is running");
