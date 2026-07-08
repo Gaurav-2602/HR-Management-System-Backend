@@ -38,4 +38,12 @@ async function login(req, res) {
   }
 }
 
-module.exports = { login };
+function getCurrentUser(req, res) {
+  return res.status(200).json({
+    success: true,
+    message: 'Current user retrieved',
+    data: req.user
+  });
+}
+
+module.exports = { login, getCurrentUser };
