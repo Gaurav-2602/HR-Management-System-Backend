@@ -6,6 +6,7 @@ const authRoutes = require('./src/routes/authRoutes');
 const mentorRoutes = require('./src/routes/mentorRoutes');
 const internRoutes = require('./src/routes/internRoutes');
 const assignmentRoutes = require('./src/routes/assignmentRoutes');
+const progressRoutes = require('./src/routes/progressRoutes');
 
 dotenv.config();
 
@@ -27,6 +28,9 @@ app.use('/api/interns', internRoutes);
 
 // Mount assignment routes
 app.use('/api/assignments', assignmentRoutes);
+
+// Mount progress routes
+app.use('/api/progress', progressRoutes);
 
 app.get("/", (req, res) => {
   res.send("HR Management System API is running");
