@@ -89,10 +89,57 @@ async function deleteIntern(req, res) {
   }
 }
 
+async function issueCertificate(req, res) {
+  try {
+    const internId = req.params.id;
+    const adminId = req.user.id;
+    const { certificateNumber, finalHrRemarks } = req.body;
+
+    const updatedIntern = await internService.issueCertificate(internId, adminId, {
+      certificateNumber,
+      finalHrRemarks
+    });
+
+    res.status(200).json({
+      message: 'Certificate issued successfully',
+      intern: internService.mapSafeIssuanceDetails(updatedIntern)
+    });
+  } catch (err) {
+    if (err.code === 'NOT_FOUND') {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.code === 'VALIDATION_ERROR') {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'Certificate number already exists' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+async function getIssuanceDetails(req, res) {
+  try {
+    const internId = req.params.id;
+    const intern = await internService.getIssuanceDetails(internId);
+    res.status(200).json(internService.mapSafeIssuanceDetails(intern));
+  } catch (err) {
+    if (err.code === 'NOT_FOUND') {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.code === 'VALIDATION_ERROR') {
+      return res.status(400).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   createIntern,
   getAllInterns,
   getInternById,
   updateIntern,
-  deleteIntern
+  deleteIntern,
+  issueCertificate,
+  getIssuanceDetails
 };

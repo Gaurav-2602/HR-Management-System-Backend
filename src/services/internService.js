@@ -1,5 +1,7 @@
 const Intern = require('../models/Intern');
 const Counter = require('../models/Counter');
+const Progress = require('../models/Progress');
+const Assignment = require('../models/Assignment');
 
 async function generateInternId() {
   const currentYear = new Date().getFullYear();
@@ -184,7 +186,7 @@ async function getInternById(internId) {
 async function updateIntern(internId, updates) {
   const intern = await getInternById(internId);
 
-  const protectedFields = ['internId', 'status', 'isActive', 'createdAt', 'updatedAt'];
+  const protectedFields = ['internId', 'status', 'isActive', 'createdAt', 'updatedAt', 'certificateNumber', 'issuedAt', 'issuedBy', 'finalHrRemarks'];
   protectedFields.forEach(field => {
     delete updates[field];
   });
@@ -248,6 +250,161 @@ async function deleteInternSoft(internId) {
   return intern;
 }
 
+async function issueCertificate(internId, adminId, input) {
+  if (!isValidObjectId(internId)) {
+    const err = new Error('Intern not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+
+  const intern = await Intern.findById(internId);
+  if (!intern || !intern.isActive) {
+    const err = new Error('Intern not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+
+  if (intern.status !== 'COMPLETED') {
+    const err = new Error('Intern status must be COMPLETED');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  const { certificateNumber, finalHrRemarks } = input;
+  if (!certificateNumber || typeof certificateNumber !== 'string' || certificateNumber.trim() === '') {
+    const err = new Error('Certificate number is required');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  const sanitizedCertificateNumber = certificateNumber.trim();
+  if (sanitizedCertificateNumber.length > 50) {
+    const err = new Error('Certificate number exceeds maximum length of 50 characters');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  let sanitizedRemarks;
+  if (finalHrRemarks !== undefined) {
+    if (typeof finalHrRemarks !== 'string') {
+      const err = new Error('Invalid final HR remarks');
+      err.code = 'VALIDATION_ERROR';
+      throw err;
+    }
+    const trimmedRemarks = finalHrRemarks.trim();
+    if (trimmedRemarks === '') {
+      const err = new Error('Invalid final HR remarks');
+      err.code = 'VALIDATION_ERROR';
+      throw err;
+    }
+    if (trimmedRemarks.length > 500) {
+      const err = new Error('Final HR remarks exceeds maximum length of 500 characters');
+      err.code = 'VALIDATION_ERROR';
+      throw err;
+    }
+    sanitizedRemarks = trimmedRemarks;
+  }
+
+  const currentAssignment = await Assignment.findOne({
+    internId,
+    status: 'ACCEPTED'
+  }).sort({
+    assignedAt: -1,
+    createdAt: -1
+  });
+
+  if (!currentAssignment) {
+    const err = new Error('Intern lacks a valid final progress completion record');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  const finalProgress = await Progress.findOne({
+    internId,
+    assignmentId: currentAssignment._id,
+    isFinal: true,
+    progressPercentage: 100
+  });
+
+  if (!finalProgress) {
+    const err = new Error('Intern lacks a valid final progress completion record');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  const setOps = {
+    status: 'ISSUED',
+    certificateNumber: sanitizedCertificateNumber,
+    issuedAt: new Date(),
+    issuedBy: adminId
+  };
+
+  if (sanitizedRemarks !== undefined) {
+    setOps.finalHrRemarks = sanitizedRemarks;
+  }
+
+  const updatedIntern = await Intern.findOneAndUpdate(
+    { _id: internId, isActive: true, status: 'COMPLETED' },
+    { $set: setOps },
+    { new: true, runValidators: true }
+  );
+
+  if (!updatedIntern) {
+    const err = new Error('Workflow conflict: Intern status was modified by another request');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  return updatedIntern;
+}
+
+async function getIssuanceDetails(internId) {
+  if (!isValidObjectId(internId)) {
+    const err = new Error('Intern not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+
+  const intern = await Intern.findById(internId);
+  if (!intern || !intern.isActive) {
+    const err = new Error('Intern not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+
+  if (intern.status !== 'COMPLETED' && intern.status !== 'ISSUED') {
+    const err = new Error('Intern is not in an eligible state for issuance details');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  return intern;
+}
+
+function mapSafeIssuanceDetails(intern) {
+  const result = {
+    id: intern._id.toString(),
+    internId: intern.internId,
+    fullName: intern.fullName,
+    email: intern.email,
+    instituteName: intern.instituteName,
+    branch: intern.branch,
+    trainingType: intern.trainingType,
+    startDate: intern.startDate,
+    endDate: intern.endDate,
+    status: intern.status,
+    certificateNumber: intern.certificateNumber,
+    issuedAt: intern.issuedAt,
+    issuedBy: intern.issuedBy ? intern.issuedBy.toString() : undefined
+  };
+
+  if (intern.finalHrRemarks !== undefined && intern.finalHrRemarks !== null) {
+    result.finalHrRemarks = intern.finalHrRemarks;
+  }
+
+  return result;
+}
+
 module.exports = {
   createIntern,
   getAllInterns,
@@ -256,5 +413,8 @@ module.exports = {
   deleteInternSoft,
   getInternListItem,
   getInternDetails,
-  isValidObjectId
+  isValidObjectId,
+  issueCertificate,
+  getIssuanceDetails,
+  mapSafeIssuanceDetails
 };

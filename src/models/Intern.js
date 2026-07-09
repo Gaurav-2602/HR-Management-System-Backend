@@ -103,6 +103,23 @@ const internSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    certificateNumber: {
+      type: String,
+      trim: true,
+      maxlength: 50
+    },
+    issuedAt: {
+      type: Date
+    },
+    issuedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    finalHrRemarks: {
+      type: String,
+      trim: true,
+      maxlength: 500
+    },
     status: {
       type: String,
       enum: ['NEW', 'ASSIGNED', 'REJECTED_BY_MENTOR', 'ONGOING', 'COMPLETED', 'ISSUED'],
@@ -116,6 +133,15 @@ const internSchema = new mongoose.Schema(
     }
   },
   { timestamps: true }
+);
+
+internSchema.index(
+  { certificateNumber: 1 },
+  {
+    unique: true,
+    sparse: true,
+    collation: { locale: 'en', strength: 2 }
+  }
 );
 
 internSchema.pre('save', function () {

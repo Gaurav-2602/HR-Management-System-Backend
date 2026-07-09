@@ -5,7 +5,9 @@ const {
   getAllInterns,
   getInternById,
   updateIntern,
-  deleteIntern
+  deleteIntern,
+  issueCertificate,
+  getIssuanceDetails
 } = require('../controllers/internController');
 
 const router = express.Router();
@@ -15,6 +17,10 @@ router.use(authorizeRoles('HR_ADMIN'));
 
 router.post('/', createIntern);
 router.get('/', getAllInterns);
+
+router.get('/:id/issuance', getIssuanceDetails);
+router.post('/:id/issue', issueCertificate);
+
 router.get('/:id', getInternById);
 router.put('/:id', updateIntern);
 router.delete('/:id', deleteIntern);
