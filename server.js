@@ -11,12 +11,32 @@ const dashboardRoutes = require('./src/routes/dashboardRoutes');
 
 dotenv.config();
 
-connectDB();
-
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+
+// Dynamic CORS configuration based on environment
+const allowedOrigins = ['http://localhost:5173'];
+if (process.env.FRONTEND_URL) {
+  const prodOrigin = process.env.FRONTEND_URL.replace(/\/$/, "");
+  if (prodOrigin) {
+    allowedOrigins.push(prodOrigin);
+  }
+}
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    
+    const normalizedOrigin = origin.replace(/\/$/, "");
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
+}));
 
 // Mount auth routes
 app.use('/api/auth', authRoutes);
@@ -42,6 +62,12 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Defer server startup until database connection is successful
+async function startServer() {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+startServer();
